@@ -2,6 +2,8 @@
 #include "ui_mainwindow.h"
 #include "QTime"
 #include "QMessageBox"
+#include "QDebug"
+#include "iostream"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -115,9 +117,15 @@ void MainWindow::on_close_btn_clicked()
 
 void MainWindow::Read_Date()
 {
+    static int cnt = 0;
     QByteArray buf;
     buf = serialport->readAll();
+
     if(!buf.isEmpty()){
+        if(buf.size() != 7){
+            cnt++;
+            std::cout<<cnt<<std::endl;
+        }
         if(textstate_receive == true)   //文本模式
         {
             QString str = ui->recv_text_window->toPlainText();
@@ -148,8 +156,8 @@ void MainWindow::on_recv_text_clicked()
         ui->recv_text->setText("hex模式");
     }
     else{
-        textstate_receive = false;
         ui->recv_text->setText("文本模式");
+        textstate_receive = false;
     }
 }
 
@@ -157,18 +165,19 @@ void MainWindow::on_recv_text_clicked()
 void MainWindow::on_send_text_clicked()
 {
     if(ui->send_text->text() == "文本模式"){
-        textstate_receive = true;
+        textstate_send = true;
         ui->send_text->setText("hex模式");
     }
     else{
-        textstate_receive = false;
         ui->send_text->setText("文本模式");
+        textstate_send = false;
     }
 }
 
 
 void MainWindow::on_send_data_clicked()
 {
+    std::cout<<__func__<<std::endl;
     if(textstate_send == true)  //文版模式
     {
         serialport->write(ui->send_text_window->toPlainText().toLatin1());
@@ -177,6 +186,7 @@ void MainWindow::on_send_data_clicked()
     if(textstate_send == false)     //16进制
     {
         QString str = ui->send_text_window->toPlainText();
+        qDebug()<<str;
         int num = str.toInt();
         str = str.setNum(num,16);
         ui->send_text_window->clear();
@@ -238,5 +248,14 @@ void MainWindow::setupQuadraticDemo(QCustomPlot *customPlot)
     customPlot->legend->setIconSize(50, 20);
     customPlot->legend->setVisible(true);
     customPlot->axisRect()->insetLayout()->setInsetAlignment(0, Qt::AlignLeft | Qt::AlignTop);
+}
+
+uint8_t MainWindow::checkData(uint8_t *input, int size)
+{
+    uint16_t sum{0};
+    for(int i=0;i<size;i++){
+        sum += input[i];
+    }
+    return (sum&0xff);
 }
 

@@ -10,6 +10,16 @@ QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
 
+typedef struct frame_{
+    uint8_t head;
+    uint8_t type;
+    uint8_t status;
+    uint8_t work_mode;
+    uint8_t value[2];
+    uint8_t check;
+}frame;
+
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -38,10 +48,13 @@ private:
     void PortConfigureInit();
     void setupQuadraticDemo(QCustomPlot *customPlot);
 
+    static uint8_t checkData(uint8_t* input, int size);
+
 private:
     Ui::MainWindow *ui;
     QSerialPort *serialport;
     bool textstate_receive;
     bool textstate_send;
+    frame mFrame;
 };
 #endif // MAINWINDOW_H

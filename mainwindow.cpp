@@ -124,7 +124,7 @@ void MainWindow::Read_Date()
     if(!buf.isEmpty()){
         if(buf.size() != 7){
             cnt++;
-            std::cout<<cnt<<std::endl;
+            std::cout<<"single time recv len error total : "<<cnt<<std::endl;
         }
         if(textstate_receive == true)   //文本模式
         {
@@ -137,10 +137,14 @@ void MainWindow::Read_Date()
         if(textstate_receive == false)   //文本模式
         {
             QString str = ui->recv_text_window->toPlainText();
+            if(str.size()>500){
+                str = str.right(500);
+            }
             // byteArray 转 16进制
             QByteArray temp = buf.toHex();
-            str+=tr(temp);
+            str += tr(temp);
             str += "  ";
+            qDebug()<<str.size();
             ui->recv_text_window->clear();
             ui->recv_text_window->append(str);
         }

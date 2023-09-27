@@ -5,6 +5,8 @@
 #include <QtSerialPort/QSerialPort>
 #include <QtSerialPort/QSerialPortInfo>
 #include "customplot/qcustomplot.h"
+#include "QTimer"
+#include "RingBuffer.hpp"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -41,6 +43,8 @@ private slots:
     void on_send_clear_clicked();
 
     void on_recv_clear_clicked();
+    void realtimeDataSlot();
+    void updateLabel();
 
 private:
     void GetAveriablePort();
@@ -49,6 +53,8 @@ private:
     void setupQuadraticDemo(QCustomPlot *customPlot);
 
     static uint8_t checkData(uint8_t* input, int size);
+    static bool checkData(const frame& frame);
+    static void convert(const QByteArray& buf, int size, frame* frame);
 
 private:
     Ui::MainWindow *ui;
@@ -56,5 +62,7 @@ private:
     bool textstate_receive;
     bool textstate_send;
     frame mFrame;
+    QTimer dataTimer;
+    QTimer labelTimer;
 };
 #endif // MAINWINDOW_H

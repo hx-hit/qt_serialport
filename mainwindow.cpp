@@ -4,6 +4,9 @@
 #include "QMessageBox"
 #include "QDebug"
 #include "iostream"
+#include "cmd.h"
+
+RingBuffer<frame, 5> ringBuffer;
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -142,6 +145,8 @@ void MainWindow::Read_Date()
             }
             // byteArray 转 16进制
             QByteArray temp = buf.toHex();
+            convert(temp, 7, &mFrame);
+            ringBuffer.push_back(mFrame);
             str += tr(temp);
             str += "  ";
             qDebug()<<str.size();
@@ -213,45 +218,111 @@ void MainWindow::on_recv_clear_clicked()
 
 void MainWindow::setupQuadraticDemo(QCustomPlot *customPlot)
 {
-    customPlot->axisRect()->setBackground(QPixmap("./solarpanels.jpg"));
-    customPlot->addGraph();
-    customPlot->graph()->setLineStyle(QCPGraph::lsLine);
-    QPen pen;
-    pen.setColor(QColor(255, 200, 20, 200));
-    pen.setStyle(Qt::DashLine);
-    pen.setWidthF(2.5);
-    customPlot->graph()->setPen(pen);
-    customPlot->graph()->setBrush(QBrush(QColor(255,200,20,70)));
-    customPlot->graph()->setScatterStyle(QCPScatterStyle(QPixmap("./sun.png")));
-    // set graph name, will show up in legend next to icon:
-    customPlot->graph()->setName("Data from Photovoltaic\nenergy barometer 2011");
-    // set data:
-    QVector<double> year, value;
-    year  << 2005 << 2006 << 2007 << 2008  << 2009  << 2010 << 2011;
-    value << 2.17 << 3.42 << 4.94 << 10.38 << 15.86 << 29.33 << 52.1;
-    customPlot->graph()->setData(year, value);
+    customPlot->addGraph(); // blue line
+    customPlot->graph(0)->setPen(QPen(QColor(40, 110, 255)));
+    customPlot->graph(0)->setName("阀门目标位置");
+    customPlot->addGraph(); // red line
+    customPlot->graph(1)->setPen(QPen(QColor(255, 110, 40)));
+    customPlot->graph(1)->setName("阀门实际位置");
+    customPlot->addGraph(); // red line
+    customPlot->graph(2)->setPen(QPen(QColor(40, 255, 40)));
+    customPlot->graph(2)->setName("压力目标位置");
+    customPlot->addGraph(); // red line
+    customPlot->graph(3)->setPen(QPen(QColor(255, 40, 255)));
+    customPlot->graph(3)->setName("压力传感器1");
+    customPlot->addGraph(); // red line
+    customPlot->graph(4)->setPen(QPen(QColor(255, 255, 40)));
+    customPlot->graph(4)->setName("压力传感器2");
 
-    // set title of plot:
-    customPlot->plotLayout()->insertRow(0);
-    customPlot->plotLayout()->addElement(0, 0, new QCPTextElement(customPlot, "Regenerative Energies", QFont("sans", 12, QFont::Bold)));
-    // axis configurations:
-    customPlot->xAxis->setLabel("Year");
-    customPlot->yAxis->setLabel("Installed Gigawatts of\nphotovoltaic in the European Union");
-    customPlot->xAxis2->setVisible(true);
-    customPlot->yAxis2->setVisible(true);
-    customPlot->xAxis2->setTickLabels(false);
-    customPlot->yAxis2->setTickLabels(false);
-    customPlot->xAxis2->setTicks(false);
-    customPlot->yAxis2->setTicks(false);
-    customPlot->xAxis2->setSubTicks(false);
-    customPlot->yAxis2->setSubTicks(false);
-    customPlot->xAxis->setRange(2004.5, 2011.5);
-    customPlot->yAxis->setRange(0, 52);
+    QSharedPointer<QCPAxisTickerTime> timeTicker(new QCPAxisTickerTime);
+    timeTicker->setTimeFormat("%h:%m:%s");
+    customPlot->xAxis->setTicker(timeTicker);
+    customPlot->axisRect()->setupFullAxesBox();
+    customPlot->yAxis->setRange(0, 10000);
+
+    // make left and bottom axes transfer their ranges to right and top axes:
+    connect(customPlot->xAxis, SIGNAL(rangeChanged(QCPRange)), customPlot->xAxis2, SLOT(setRange(QCPRange)));
+    connect(customPlot->yAxis, SIGNAL(rangeChanged(QCPRange)), customPlot->yAxis2, SLOT(setRange(QCPRange)));
+
     // setup legend:
-    customPlot->legend->setFont(QFont(font().family(), 7));
-    customPlot->legend->setIconSize(50, 20);
+    customPlot->legend->setFont(QFont(font().family(), 6));
+    customPlot->legend->setIconSize(50, 15);
     customPlot->legend->setVisible(true);
     customPlot->axisRect()->insetLayout()->setInsetAlignment(0, Qt::AlignLeft | Qt::AlignTop);
+
+    // setup a timer that repeatedly calls MainWindow::realtimeDataSlot:
+    connect(&dataTimer, SIGNAL(timeout()), this, SLOT(realtimeDataSlot()));
+    dataTimer.start(10); // Interval 0 means to refresh as fast as possible
+    connect(&labelTimer, SIGNAL(timeout()), this, SLOT(updateLabel()));
+    labelTimer.start(100);
+}
+
+void MainWindow::realtimeDataSlot()
+{
+    static QTime timeStart = QTime::currentTime();
+    // calculate two new data points:
+    double key = timeStart.msecsTo(QTime::currentTime())/1000.0; // time elapsed since start of demo, in seconds
+    static double lastPointKey = 0;
+    if (key-lastPointKey > 0.010) // at most add point every 2 ms
+    {
+        // add data to lines:
+        if(ui->check_target_position->isChecked()){
+            ui->customplot->graph(0)->addData(key, (qSin(key)+std::rand()/(double)RAND_MAX*1*qSin(key/0.3843))*8000);
+        }
+        if(ui->check_real_position->isChecked()){
+            ui->customplot->graph(1)->addData(key, (qCos(key)+std::rand()/(double)RAND_MAX*0.5*qSin(key/0.4364))*8000);
+        }
+        if(ui->check_target_pressure->isChecked()){
+            ui->customplot->graph(2)->addData(key, (qCos(key)+std::rand()/(double)RAND_MAX*0.5*qSin(key/0.4364))*8000);
+        }
+        if(ui->check_pressure1->isChecked()){
+            ui->customplot->graph(3)->addData(key, (qCos(key)+std::rand()/(double)RAND_MAX*0.5*qSin(key/0.4364))*8000);
+        }
+        if(ui->check_pressure2->isChecked()){
+            ui->customplot->graph(4)->addData(key, (qCos(key)+std::rand()/(double)RAND_MAX*0.5*qSin(key/0.4364))*8000);
+        }
+
+        // rescale value (vertical) axis to fit the current data:
+        //ui->customPlot->graph(0)->rescaleValueAxis();
+        //ui->customPlot->graph(1)->rescaleValueAxis(true);
+        lastPointKey = key;
+    }
+    // make key axis range scroll with the data (at a constant range size of 8):
+    ui->customplot->xAxis->setRange(key, 8, Qt::AlignRight);
+    ui->customplot->replot();
+}
+
+void MainWindow::updateLabel()
+{
+    bool check;
+    uint8_t type;
+    uint16_t value;
+    auto frame = std::move(ringBuffer.front());
+    ringBuffer.pop_front();
+    check = checkData(frame);
+    type = frame.type;
+    value = (frame.value[0]<<8)|(frame.value[1]);
+    if(check){
+        switch (type) {
+        case cmd::T_POSITION:
+            ui->lb_target_position->setText(QString::number(value));
+            break;
+        case cmd::R_POSITION:
+            ui->lb_real_position->setText(QString::number(value));
+            break;
+        case cmd::T_PRESSURE:
+            ui->lb_target_pressure->setText(QString::number(value));
+            break;
+        case cmd::PRESSURE_1:
+            ui->lb_pressure1->setText(QString::number(value));
+            break;
+        case cmd::PRESSURE_2:
+            ui->lb_pressure2->setText(QString::number(value));
+            break;
+        default:
+            break;
+        }
+    }
 }
 
 uint8_t MainWindow::checkData(uint8_t *input, int size)
@@ -261,5 +332,24 @@ uint8_t MainWindow::checkData(uint8_t *input, int size)
         sum += input[i];
     }
     return (sum&0xff);
+}
+
+bool MainWindow::checkData(const frame& frame)
+{
+    uint8_t buf[7] = {0};
+    memcpy(buf, (const uint8_t*)&frame, sizeof(frame));
+    auto temp = checkData(buf, 4);
+    return temp==buf[6];
+}
+
+void MainWindow::convert(const QByteArray& buf, int size, frame* frame)
+{
+    char array[10] = {0};
+    for(int i=0;i<size;i++){
+        array[i] = buf.at(i);
+    }
+    if(frame != nullptr){
+        memcpy(frame, array, size);
+    }
 }
 

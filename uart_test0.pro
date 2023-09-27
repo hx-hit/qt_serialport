@@ -14,6 +14,8 @@ SOURCES += \
     mainwindow.cpp
 
 HEADERS += \
+    RingBuffer.hpp \
+    cmd.h \
     customplot/qcustomplot.h \
     mainwindow.h
 

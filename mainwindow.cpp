@@ -3,7 +3,6 @@
 #include "QTime"
 #include "QMessageBox"
 #include "QDebug"
-#include "iostream"
 #include "cmd.h"
 
 RingBuffer<frame, 5> ringBuffer;
@@ -12,7 +11,11 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
+    for(int i=0;i<5;i++){
+        mValues[i] = 0;
+    }
     ui->setupUi(this);
+
     serialport = new QSerialPort;
     GetAveriablePort();
     PortConfigureInit();
@@ -128,6 +131,10 @@ void MainWindow::Read_Date()
         if(buf.size() != 7){
             cnt++;
             std::cout<<"single time recv len error total : "<<cnt<<std::endl;
+        }else{
+            data_mut.lock();
+            convert(buf, 7, &mFrame);
+            data_mut.unlock();
         }
         if(textstate_receive == true)   //文本模式
         {
@@ -145,11 +152,9 @@ void MainWindow::Read_Date()
             }
             // byteArray 转 16进制
             QByteArray temp = buf.toHex();
-            convert(temp, 7, &mFrame);
-            ringBuffer.push_back(mFrame);
             str += tr(temp);
             str += "  ";
-            qDebug()<<str.size();
+//            qDebug()<<str.size();
             ui->recv_text_window->clear();
             ui->recv_text_window->append(str);
         }
@@ -254,11 +259,24 @@ void MainWindow::setupQuadraticDemo(QCustomPlot *customPlot)
     connect(&dataTimer, SIGNAL(timeout()), this, SLOT(realtimeDataSlot()));
     dataTimer.start(10); // Interval 0 means to refresh as fast as possible
     connect(&labelTimer, SIGNAL(timeout()), this, SLOT(updateLabel()));
-    labelTimer.start(100);
+    labelTimer.start(50);
 }
 
 void MainWindow::realtimeDataSlot()
 {
+    bool check;
+    uint8_t type;
+    uint16_t value;
+    frame frame_tmp;
+    data_mut.lock();
+    memcpy(&frame_tmp, &mFrame, sizeof(frame));
+    data_mut.unlock();
+    check = checkData(frame_tmp);
+    type = frame_tmp.type;
+    value = (frame_tmp.value[0]<<8)|(frame_tmp.value[1]);
+    if(check && (type>=cmd::T_POSITION) && (type<=cmd::PRESSURE_2)){
+        mValues[type-1] = value;
+    }
     static QTime timeStart = QTime::currentTime();
     // calculate two new data points:
     double key = timeStart.msecsTo(QTime::currentTime())/1000.0; // time elapsed since start of demo, in seconds
@@ -267,19 +285,24 @@ void MainWindow::realtimeDataSlot()
     {
         // add data to lines:
         if(ui->check_target_position->isChecked()){
-            ui->customplot->graph(0)->addData(key, (qSin(key)+std::rand()/(double)RAND_MAX*1*qSin(key/0.3843))*8000);
+//            if(type == cmd::T_POSITION)
+                ui->customplot->graph(0)->addData(key, mValues[0]);
         }
         if(ui->check_real_position->isChecked()){
-            ui->customplot->graph(1)->addData(key, (qCos(key)+std::rand()/(double)RAND_MAX*0.5*qSin(key/0.4364))*8000);
+//            if(type == cmd::R_POSITION)
+                ui->customplot->graph(1)->addData(key, mValues[1]);
         }
         if(ui->check_target_pressure->isChecked()){
-            ui->customplot->graph(2)->addData(key, (qCos(key)+std::rand()/(double)RAND_MAX*0.5*qSin(key/0.4364))*8000);
+//            if(type == cmd::T_PRESSURE)
+                ui->customplot->graph(2)->addData(key, mValues[2]);
         }
         if(ui->check_pressure1->isChecked()){
-            ui->customplot->graph(3)->addData(key, (qCos(key)+std::rand()/(double)RAND_MAX*0.5*qSin(key/0.4364))*8000);
+//            if(type == cmd::PRESSURE_1)
+                ui->customplot->graph(3)->addData(key, mValues[3]);
         }
         if(ui->check_pressure2->isChecked()){
-            ui->customplot->graph(4)->addData(key, (qCos(key)+std::rand()/(double)RAND_MAX*0.5*qSin(key/0.4364))*8000);
+//            if(type == cmd::PRESSURE_2)
+                ui->customplot->graph(4)->addData(key, mValues[4]);
         }
 
         // rescale value (vertical) axis to fit the current data:
@@ -295,14 +318,18 @@ void MainWindow::realtimeDataSlot()
 void MainWindow::updateLabel()
 {
     bool check;
-    uint8_t type;
+    uint8_t type, status, mode;
     uint16_t value;
-    auto frame = std::move(ringBuffer.front());
-    ringBuffer.pop_front();
-    check = checkData(frame);
-    type = frame.type;
-    value = (frame.value[0]<<8)|(frame.value[1]);
+    frame frame_tmp;
+    data_mut.lock();
+    memcpy(&frame_tmp, &mFrame, sizeof(frame));
+    data_mut.unlock();
+    check = checkData(frame_tmp);
     if(check){
+        type = frame_tmp.type;
+        status = frame_tmp.status;
+        mode = frame_tmp.work_mode;
+        value = (frame_tmp.value[0]<<8)|(frame_tmp.value[1]);
         switch (type) {
         case cmd::T_POSITION:
             ui->lb_target_position->setText(QString::number(value));
@@ -318,6 +345,44 @@ void MainWindow::updateLabel()
             break;
         case cmd::PRESSURE_2:
             ui->lb_pressure2->setText(QString::number(value));
+            break;
+        default:
+            break;
+        }
+        switch(status){
+        case 0 :
+            ui->lb_system_status->setText("调零");
+            break;
+        case 1 :
+            ui->lb_system_status->setText("学习");
+            break;
+        case 2 :
+            ui->lb_system_status->setText("工作");
+            break;
+        case 3 :
+            ui->lb_system_status->setText("故障");
+            break;
+        case 4 :
+            ui->lb_system_status->setText("空闲");
+            break;
+        default:
+            break;
+        }
+        switch(mode){
+        case 1 :
+            ui->lb_system_status->setText("全开");
+            break;
+        case 2 :
+            ui->lb_system_status->setText("全关");
+            break;
+        case 3 :
+            ui->lb_system_status->setText("压力");
+            break;
+        case 4 :
+            ui->lb_system_status->setText("位置");
+            break;
+        case 5 :
+            ui->lb_system_status->setText("保持");
             break;
         default:
             break;
@@ -338,7 +403,7 @@ bool MainWindow::checkData(const frame& frame)
 {
     uint8_t buf[7] = {0};
     memcpy(buf, (const uint8_t*)&frame, sizeof(frame));
-    auto temp = checkData(buf, 4);
+    auto temp = checkData(buf+2, 4);
     return temp==buf[6];
 }
 

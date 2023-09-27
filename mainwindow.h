@@ -7,6 +7,8 @@
 #include "customplot/qcustomplot.h"
 #include "QTimer"
 #include "RingBuffer.hpp"
+#include "iostream"
+#include "mutex"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -64,5 +66,7 @@ private:
     frame mFrame;
     QTimer dataTimer;
     QTimer labelTimer;
+    std::mutex data_mut;
+    uint16_t mValues[5];
 };
 #endif // MAINWINDOW_H

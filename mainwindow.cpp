@@ -370,19 +370,19 @@ void MainWindow::updateLabel()
         }
         switch(mode){
         case 1 :
-            ui->lb_system_status->setText("全开");
+            ui->lb_valve_mode->setText("全开");
             break;
         case 2 :
-            ui->lb_system_status->setText("全关");
+            ui->lb_valve_mode->setText("全关");
             break;
         case 3 :
-            ui->lb_system_status->setText("压力");
+            ui->lb_valve_mode->setText("压力");
             break;
         case 4 :
-            ui->lb_system_status->setText("位置");
+            ui->lb_valve_mode->setText("位置");
             break;
         case 5 :
-            ui->lb_system_status->setText("保持");
+            ui->lb_valve_mode->setText("保持");
             break;
         default:
             break;

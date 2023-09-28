@@ -14,6 +14,7 @@ MainWindow::MainWindow(QWidget *parent)
     for(int i=0;i<5;i++){
         mValues[i] = 0;
     }
+    stop_display = false;
     ui->setupUi(this);
 
     serialport = new QSerialPort;
@@ -223,6 +224,7 @@ void MainWindow::on_recv_clear_clicked()
 
 void MainWindow::setupQuadraticDemo(QCustomPlot *customPlot)
 {
+    customPlot->setInteractions(QCP::iRangeDrag | QCP::iRangeZoom);
     customPlot->addGraph(); // blue line
     customPlot->graph(0)->setPen(QPen(QColor(40, 110, 255)));
     customPlot->graph(0)->setName("阀门目标位置");
@@ -257,9 +259,9 @@ void MainWindow::setupQuadraticDemo(QCustomPlot *customPlot)
 
     // setup a timer that repeatedly calls MainWindow::realtimeDataSlot:
     connect(&dataTimer, SIGNAL(timeout()), this, SLOT(realtimeDataSlot()));
-    dataTimer.start(10); // Interval 0 means to refresh as fast as possible
+    dataTimer.start(8); // Interval 0 means to refresh as fast as possible
     connect(&labelTimer, SIGNAL(timeout()), this, SLOT(updateLabel()));
-    labelTimer.start(50);
+    labelTimer.start(15);
 }
 
 void MainWindow::realtimeDataSlot()
@@ -278,10 +280,13 @@ void MainWindow::realtimeDataSlot()
         mValues[type-1] = value;
     }
     static QTime timeStart = QTime::currentTime();
+    if(stop_display){
+        return;
+    }
     // calculate two new data points:
     double key = timeStart.msecsTo(QTime::currentTime())/1000.0; // time elapsed since start of demo, in seconds
     static double lastPointKey = 0;
-    if (key-lastPointKey > 0.010) // at most add point every 2 ms
+    if (key-lastPointKey > 0.008) // at most add point every 2 ms
     {
         // add data to lines:
         if(ui->check_target_position->isChecked()){
@@ -304,11 +309,15 @@ void MainWindow::realtimeDataSlot()
 //            if(type == cmd::PRESSURE_2)
                 ui->customplot->graph(4)->addData(key, mValues[4]);
         }
-
         // rescale value (vertical) axis to fit the current data:
         //ui->customPlot->graph(0)->rescaleValueAxis();
         //ui->customPlot->graph(1)->rescaleValueAxis(true);
         lastPointKey = key;
+    }
+    if(key > 60){
+        for(int i=0;i<5;i++){
+                ui->customplot->graph(i)->removeDataBefore(key-60.0);
+        }
     }
     // make key axis range scroll with the data (at a constant range size of 8):
     ui->customplot->xAxis->setRange(key, 8, Qt::AlignRight);
@@ -415,6 +424,19 @@ void MainWindow::convert(const QByteArray& buf, int size, frame* frame)
     }
     if(frame != nullptr){
         memcpy(frame, array, size);
+    }
+}
+
+
+void MainWindow::on_btn_stop_clicked()
+{
+    if(ui->btn_stop->text() == "暂停"){
+        stop_display = true;
+        ui->btn_stop->setText("运行");
+    }
+    else{
+        ui->btn_stop->setText("暂停");
+        stop_display = false;
     }
 }
 

@@ -48,6 +48,8 @@ private slots:
     void realtimeDataSlot();
     void updateLabel();
 
+    void on_btn_stop_clicked();
+
 private:
     void GetAveriablePort();
     void msleep(int msec);
@@ -63,6 +65,7 @@ private:
     QSerialPort *serialport;
     bool textstate_receive;
     bool textstate_send;
+    bool stop_display;
     frame mFrame;
     QTimer dataTimer;
     QTimer labelTimer;

@@ -5540,6 +5540,7 @@ public:
   // non-property methods:
   void addData(const QVector<double> &keys, const QVector<double> &values, bool alreadySorted=false);
   void addData(double key, double value);
+  void removeDataBefore(double key);
   
   // reimplemented virtual methods:
   virtual double selectTest(const QPointF &pos, bool onlySelectable, QVariant *details=nullptr) const Q_DECL_OVERRIDE;

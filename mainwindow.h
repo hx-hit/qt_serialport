@@ -9,6 +9,17 @@
 #include "RingBuffer.hpp"
 #include "iostream"
 #include "mutex"
+#include "condition_variable"
+#include "thread"
+#include "deque"
+#include "map"
+#include "xlsxdocument.h"
+#include "xlsxchartsheet.h"
+#include "xlsxcellrange.h"
+#include "xlsxchart.h"
+#include "xlsxrichstring.h"
+#include "xlsxworkbook.h"
+using namespace QXlsx;
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -50,11 +61,22 @@ private slots:
 
     void on_btn_stop_clicked();
 
+    void on_btn_save_s1_clicked();
+
+    void on_btn_save_t_po_clicked();
+
+    void on_btn_save_r_po_clicked();
+
+    void on_btn_save_t_pr_clicked();
+
+    void on_btn_save_s2_clicked();
+
 private:
     void GetAveriablePort();
     void msleep(int msec);
     void PortConfigureInit();
     void setupQuadraticDemo(QCustomPlot *customPlot);
+    void save_thread_function();
 
     static uint8_t checkData(uint8_t* input, int size);
     static bool checkData(const frame& frame);
@@ -71,5 +93,18 @@ private:
     QTimer labelTimer;
     std::mutex data_mut;
     uint16_t mValues[5];
+    std::unique_ptr<std::thread> saveThreadPtr;
+    std::deque<frame> frameQueue;
+    bool save_flag{false};
+    bool save_t_po{false};
+    bool save_r_po{false};
+    bool save_t_pr{false};
+    bool save_r_s1{false};
+    bool save_r_s2{false};
+    std::mutex queue_mut;
+    std::condition_variable queue_cond;
+    QXlsx::Document xlsx;
+    std::map<uint8_t, std::deque<uint16_t>> saveDataMap;
+    bool saveFlagVector[5]{false,false,false,false,false};
 };
 #endif // MAINWINDOW_H

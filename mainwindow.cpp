@@ -16,7 +16,10 @@ MainWindow::MainWindow(QWidget *parent)
     }
     stop_display = false;
     ui->setupUi(this);
-
+    for(int i=1;i<=5;i++){
+        std::deque<uint16_t> temp;
+        saveDataMap.insert(std::pair<uint8_t, std::deque<uint16_t>>(i, temp));
+    }
     serialport = new QSerialPort;
     GetAveriablePort();
     PortConfigureInit();
@@ -136,6 +139,12 @@ void MainWindow::Read_Date()
             data_mut.lock();
             convert(buf, 7, &mFrame);
             data_mut.unlock();
+            auto type = mFrame.type;
+            if(saveFlagVector[type-1]){
+                uint16_t value = (mFrame.value[0]<<8)|(mFrame.value[1]);
+                auto temp_deque = saveDataMap[type];
+                temp_deque.push_back(value);
+            }
         }
         if(textstate_receive == true)   //文本模式
         {
@@ -243,6 +252,7 @@ void MainWindow::setupQuadraticDemo(QCustomPlot *customPlot)
 
     QSharedPointer<QCPAxisTickerTime> timeTicker(new QCPAxisTickerTime);
     timeTicker->setTimeFormat("%h:%m:%s");
+    timeTicker->setTickCount(10);
     customPlot->xAxis->setTicker(timeTicker);
     customPlot->axisRect()->setupFullAxesBox();
     customPlot->yAxis->setRange(0, 10000);
@@ -262,6 +272,18 @@ void MainWindow::setupQuadraticDemo(QCustomPlot *customPlot)
     dataTimer.start(8); // Interval 0 means to refresh as fast as possible
     connect(&labelTimer, SIGNAL(timeout()), this, SLOT(updateLabel()));
     labelTimer.start(15);
+}
+
+void MainWindow::save_thread_function()
+{
+//    while(1){
+//        std::unique_lock<std::mutex>lk(queue_mut);
+//        queue_cond.wait(lk, [&](){return save_flag;});
+//    }
+
+    while(save_flag){
+
+    }
 }
 
 void MainWindow::realtimeDataSlot()
@@ -286,7 +308,7 @@ void MainWindow::realtimeDataSlot()
     // calculate two new data points:
     double key = timeStart.msecsTo(QTime::currentTime())/1000.0; // time elapsed since start of demo, in seconds
     static double lastPointKey = 0;
-    if (key-lastPointKey > 0.008) // at most add point every 2 ms
+    if (key-lastPointKey > 0.005) // at most add point every 2 ms
     {
         // add data to lines:
         if(ui->check_target_position->isChecked()){
@@ -314,13 +336,13 @@ void MainWindow::realtimeDataSlot()
         //ui->customPlot->graph(1)->rescaleValueAxis(true);
         lastPointKey = key;
     }
-    if(key > 60){
+    if(key > 120){
         for(int i=0;i<5;i++){
-                ui->customplot->graph(i)->removeDataBefore(key-60.0);
+                ui->customplot->graph(i)->removeDataBefore(key-120.0);
         }
     }
     // make key axis range scroll with the data (at a constant range size of 8):
-    ui->customplot->xAxis->setRange(key, 8, Qt::AlignRight);
+    ui->customplot->xAxis->setRange(key, 90, Qt::AlignRight);
     ui->customplot->replot();
 }
 
@@ -418,6 +440,7 @@ bool MainWindow::checkData(const frame& frame)
 
 void MainWindow::convert(const QByteArray& buf, int size, frame* frame)
 {
+#if 0
     char array[10] = {0};
     for(int i=0;i<size;i++){
         array[i] = buf.at(i);
@@ -425,6 +448,11 @@ void MainWindow::convert(const QByteArray& buf, int size, frame* frame)
     if(frame != nullptr){
         memcpy(frame, array, size);
     }
+#else
+    if(frame != nullptr){
+        memcpy(frame, buf.data(), size);
+    }
+#endif
 }
 
 
@@ -437,6 +465,73 @@ void MainWindow::on_btn_stop_clicked()
     else{
         ui->btn_stop->setText("暂停");
         stop_display = false;
+    }
+}
+
+void MainWindow::on_btn_save_t_po_clicked()
+{
+
+    if(ui->btn_save_t_po->text() == "保存"){
+        ui->btn_save_t_po->setText("停止");
+        saveFlagVector[0] = true;
+        save_t_po = true;
+    }else{
+        ui->btn_save_t_po->setText("保存");
+        save_t_po = false;
+        saveFlagVector[0] = false;
+    }
+}
+
+void MainWindow::on_btn_save_r_po_clicked()
+{
+    if(ui->btn_save_r_po->text() == "保存"){
+        ui->btn_save_r_po->setText("停止");
+        saveFlagVector[1] = true;
+        save_r_po = true;
+    }else{
+        ui->btn_save_r_po->setText("保存");
+        save_r_po = false;
+        saveFlagVector[1] = false;
+    }
+}
+
+
+void MainWindow::on_btn_save_t_pr_clicked()
+{
+    if(ui->btn_save_t_pr->text() == "保存"){
+        ui->btn_save_t_pr->setText("停止");
+        save_t_pr = true;
+        saveFlagVector[2] = true;
+    }else{
+        ui->btn_save_t_pr->setText("保存");
+        save_t_pr = false;
+        saveFlagVector[2] = false;
+    }
+}
+
+void MainWindow::on_btn_save_s1_clicked()
+{
+    if(ui->btn_save_s1->text() == "保存"){
+        ui->btn_save_s1->setText("停止");
+        save_r_s1 = true;
+        saveFlagVector[3] = true;
+    }else{
+        ui->btn_save_s1->setText("保存");
+        save_r_s1 = false;
+        saveFlagVector[3] = false;
+    }
+}
+
+void MainWindow::on_btn_save_s2_clicked()
+{
+    if(ui->btn_save_s2->text() == "保存"){
+        ui->btn_save_s2->setText("停止");
+        save_r_s2 = true;
+        saveFlagVector[4] = true;
+    }else{
+        ui->btn_save_s2->setText("保存");
+        save_r_s2 = false;
+        saveFlagVector[4] = false;
     }
 }
 

@@ -17,13 +17,15 @@ include(./QXlsx/QXlsx.pri)
 SOURCES += \
     customplot/qcustomplot.cpp \
     main.cpp \
-    mainwindow.cpp
+    mainwindow.cpp \
+    savethread.cpp
 
 HEADERS += \
     RingBuffer.hpp \
     cmd.h \
     customplot/qcustomplot.h \
-    mainwindow.h
+    mainwindow.h \
+    savethread.h
 
 FORMS += \
     mainwindow.ui

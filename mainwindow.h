@@ -13,6 +13,9 @@
 #include "thread"
 #include "deque"
 #include "map"
+#include <QDateTime>
+#include "savethread.h"
+
 #include "xlsxdocument.h"
 #include "xlsxchartsheet.h"
 #include "xlsxcellrange.h"
@@ -85,7 +88,7 @@ private:
 private:
     Ui::MainWindow *ui;
     QSerialPort *serialport;
-    bool textstate_receive;
+    bool textstate_receive{false};
     bool textstate_send;
     bool stop_display;
     frame mFrame;
@@ -106,5 +109,7 @@ private:
     QXlsx::Document xlsx;
     std::map<uint8_t, std::deque<uint16_t>> saveDataMap;
     bool saveFlagVector[5]{false,false,false,false,false};
+    QThreadPool *mPool;
+    SaveThread *mSaveThread[5]{nullptr};
 };
 #endif // MAINWINDOW_H

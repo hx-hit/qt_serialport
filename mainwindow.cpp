@@ -16,7 +16,9 @@ MainWindow::MainWindow(QWidget *parent)
     }
     stop_display = false;
     ui->setupUi(this);
-    for(int i=1;i<=5;i++){
+    mPool = QThreadPool::globalInstance();
+    mPool->setMaxThreadCount(5);
+   for(int i=0;i<5;i++){
         std::deque<uint16_t> temp;
         saveDataMap.insert(std::pair<uint8_t, std::deque<uint16_t>>(i, temp));
     }
@@ -134,16 +136,20 @@ void MainWindow::Read_Date()
     if(!buf.isEmpty()){
         if(buf.size() != 7){
             cnt++;
-            std::cout<<buf.size()<<" :: single time recv len error total : "<<cnt<<std::endl;
+            std::cout<<"single time recv len error total : "<<cnt<<std::endl;
         }else{
             data_mut.lock();
             convert(buf, 7, &mFrame);
             data_mut.unlock();
             auto type = mFrame.type;
-            if(saveFlagVector[type-1]){
+            auto index = type - 1;
+            if(saveFlagVector[index]){
                 uint16_t value = (mFrame.value[0]<<8)|(mFrame.value[1]);
-                auto temp_deque = saveDataMap[type];
+                auto& temp_deque = saveDataMap[index];
+                queue_mut.lock();
                 temp_deque.push_back(value);
+                queue_mut.unlock();
+                std::cout<<"******* :: "<<temp_deque.size()<<std::endl;
             }
         }
         if(textstate_receive == true)   //文本模式
@@ -269,7 +275,7 @@ void MainWindow::setupQuadraticDemo(QCustomPlot *customPlot)
 
     // setup a timer that repeatedly calls MainWindow::realtimeDataSlot:
     connect(&dataTimer, SIGNAL(timeout()), this, SLOT(realtimeDataSlot()));
-    dataTimer.start(8); // Interval 0 means to refresh as fast as possible
+    dataTimer.start(10); // Interval 0 means to refresh as fast as possible
     connect(&labelTimer, SIGNAL(timeout()), this, SLOT(updateLabel()));
     labelTimer.start(15);
 }
@@ -336,9 +342,9 @@ void MainWindow::realtimeDataSlot()
         //ui->customPlot->graph(1)->rescaleValueAxis(true);
         lastPointKey = key;
     }
-    if(key > 120){
+    if(key > 100){
         for(int i=0;i<5;i++){
-                ui->customplot->graph(i)->removeDataBefore(key-120.0);
+                ui->customplot->graph(i)->removeDataBefore(key-100.0);
         }
     }
     // make key axis range scroll with the data (at a constant range size of 8):
@@ -372,10 +378,10 @@ void MainWindow::updateLabel()
             ui->lb_target_pressure->setText(QString::number(value));
             break;
         case cmd::PRESSURE_1:
-            ui->lb_pressure1->setText(QString::number(value));
+            ui->lb_pressure1->setText(QString::number(value*10));
             break;
         case cmd::PRESSURE_2:
-            ui->lb_pressure2->setText(QString::number(value));
+            ui->lb_pressure2->setText(QString::number(value*10));
             break;
         default:
             break;
@@ -475,6 +481,10 @@ void MainWindow::on_btn_save_t_po_clicked()
         ui->btn_save_t_po->setText("停止");
         saveFlagVector[0] = true;
         save_t_po = true;
+        auto& data_que = saveDataMap[0];
+        mSaveThread[0] = new SaveThread("targetPosition", &queue_mut, &data_que, &save_t_po);
+        mSaveThread[0]->setAutoDelete(true);
+        mPool->start(mSaveThread[0]);
     }else{
         ui->btn_save_t_po->setText("保存");
         save_t_po = false;
@@ -488,6 +498,10 @@ void MainWindow::on_btn_save_r_po_clicked()
         ui->btn_save_r_po->setText("停止");
         saveFlagVector[1] = true;
         save_r_po = true;
+        auto& data_que = saveDataMap[1];
+        mSaveThread[1] = new SaveThread("realPosition", &queue_mut, &data_que, &save_r_po);
+        mSaveThread[1]->setAutoDelete(true);
+        mPool->start(mSaveThread[1]);
     }else{
         ui->btn_save_r_po->setText("保存");
         save_r_po = false;
@@ -502,6 +516,10 @@ void MainWindow::on_btn_save_t_pr_clicked()
         ui->btn_save_t_pr->setText("停止");
         save_t_pr = true;
         saveFlagVector[2] = true;
+        auto& data_que = saveDataMap[2];
+        mSaveThread[2] = new SaveThread("targetPressure", &queue_mut, &data_que, &save_t_pr);
+        mSaveThread[2]->setAutoDelete(true);
+        mPool->start(mSaveThread[2]);
     }else{
         ui->btn_save_t_pr->setText("保存");
         save_t_pr = false;
@@ -515,6 +533,10 @@ void MainWindow::on_btn_save_s1_clicked()
         ui->btn_save_s1->setText("停止");
         save_r_s1 = true;
         saveFlagVector[3] = true;
+        auto& data_que = saveDataMap[3];
+        mSaveThread[3] = new SaveThread("pressureSensor1", &queue_mut, &data_que, &save_r_s1);
+        mSaveThread[3]->setAutoDelete(true);
+        mPool->start(mSaveThread[3]);
     }else{
         ui->btn_save_s1->setText("保存");
         save_r_s1 = false;
@@ -528,6 +550,10 @@ void MainWindow::on_btn_save_s2_clicked()
         ui->btn_save_s2->setText("停止");
         save_r_s2 = true;
         saveFlagVector[4] = true;
+        auto& data_que = saveDataMap[4];
+        mSaveThread[4] = new SaveThread("pressureSensor2", &queue_mut, &data_que, &save_r_s2);
+        mSaveThread[4]->setAutoDelete(true);
+        mPool->start(mSaveThread[4]);
     }else{
         ui->btn_save_s2->setText("保存");
         save_r_s2 = false;

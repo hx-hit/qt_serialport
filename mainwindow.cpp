@@ -275,9 +275,9 @@ void MainWindow::setupQuadraticDemo(QCustomPlot *customPlot)
 
     // setup a timer that repeatedly calls MainWindow::realtimeDataSlot:
     connect(&dataTimer, SIGNAL(timeout()), this, SLOT(realtimeDataSlot()));
-    dataTimer.start(10); // Interval 0 means to refresh as fast as possible
+    dataTimer.start(25); // Interval 0 means to refresh as fast as possible
     connect(&labelTimer, SIGNAL(timeout()), this, SLOT(updateLabel()));
-    labelTimer.start(15);
+    labelTimer.start(20);
 }
 
 void MainWindow::save_thread_function()
@@ -342,13 +342,13 @@ void MainWindow::realtimeDataSlot()
         //ui->customPlot->graph(1)->rescaleValueAxis(true);
         lastPointKey = key;
     }
-    if(key > 100){
+    if(key > 1000){
         for(int i=0;i<5;i++){
-                ui->customplot->graph(i)->removeDataBefore(key-100.0);
+                ui->customplot->graph(i)->removeDataBefore(key-1000.0);
         }
     }
     // make key axis range scroll with the data (at a constant range size of 8):
-    ui->customplot->xAxis->setRange(key, 90, Qt::AlignRight);
+    ui->customplot->xAxis->setRange(key, 900, Qt::AlignRight);
     ui->customplot->replot();
 }
 

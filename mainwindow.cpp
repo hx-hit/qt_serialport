@@ -134,7 +134,7 @@ void MainWindow::Read_Date()
     if(!buf.isEmpty()){
         if(buf.size() != 7){
             cnt++;
-            std::cout<<"single time recv len error total : "<<cnt<<std::endl;
+            std::cout<<buf.size()<<" :: single time recv len error total : "<<cnt<<std::endl;
         }else{
             data_mut.lock();
             convert(buf, 7, &mFrame);

@@ -17,7 +17,7 @@ MainWindow::MainWindow(QWidget *parent)
     stop_display = false;
     ui->setupUi(this);
     mPool = QThreadPool::globalInstance();
-    mPool->setMaxThreadCount(5);
+    mPool->setMaxThreadCount(8);
    for(int i=0;i<5;i++){
         std::deque<uint16_t> temp;
         saveDataMap.insert(std::pair<uint8_t, std::deque<uint16_t>>(i, temp));
@@ -27,6 +27,8 @@ MainWindow::MainWindow(QWidget *parent)
     PortConfigureInit();
     setupQuadraticDemo(ui->customplot);
     ui->customplot->replot();
+    saveAllThread = new std::thread(&MainWindow::save_thread_function, this);
+    saveAllThread->detach();
 }
 
 MainWindow::~MainWindow()
@@ -282,14 +284,80 @@ void MainWindow::setupQuadraticDemo(QCustomPlot *customPlot)
 
 void MainWindow::save_thread_function()
 {
-//    while(1){
-//        std::unique_lock<std::mutex>lk(queue_mut);
-//        queue_cond.wait(lk, [&](){return save_flag;});
-//    }
-
-    while(save_flag){
-
+    QXlsx::Document xlsx;
+    QDateTime current_date_time =QDateTime::currentDateTime();
+    QString current_date =current_date_time.toString("yyyy-MM-dd-hh-mm");
+    long count1{1}, count3{1}, count4{1}, countAll{1};
+    std::deque<uint16_t> *data_que_1, *data_que_3, *data_que_4;
+    while(1){
+        std::unique_lock<std::mutex>lk(cond_mut);
+        queue_cond.wait(lk, [&](){return save_flag;});
+        m_xlsx = new Document(m_saveName, this);
+        if(m_xlsx->load()){
+            qDebug() << "excel打开成功!";
+            m_xlsx->write(count1++, 1, "position");
+            m_xlsx->write(count3++, 2, "sensor1");
+            m_xlsx->write(count4++, 3, "sensor2");
+        }else{
+            qDebug() << "excel打开失败!";
+            continue;
+        }
+        data_que_1 = &saveDataMap[1];
+        data_que_3 = &saveDataMap[3];
+        data_que_4 = &saveDataMap[4];
+        while(save_all)
+        {
+#if 1
+            if(!data_que_1->empty())
+            {
+                queue_mut.lock();
+                auto data1 = data_que_1->front();
+                data_que_1->pop_front();
+                queue_mut.unlock();
+                m_xlsx->write(count1++, 1, data1);
+            }
+            if(!data_que_3->empty())
+            {
+                queue_mut.lock();
+                auto data3 = data_que_3->front();
+                data_que_3->pop_front();
+                queue_mut.unlock();
+                m_xlsx->write(count3++, 2, data3*10);
+            }
+            if(!data_que_4->empty())
+            {
+                queue_mut.lock();
+                auto data4 = data_que_4->front();
+                data_que_4->pop_front();
+                queue_mut.unlock();
+                m_xlsx->write(count4++, 3, data4*10);
+            }
+#else
+            m_xlsx->write(count1++, 1, 1);
+            m_xlsx->write(count3++, 2, 2);
+            m_xlsx->write(count4++, 3, 3);
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+#endif
+        }
+        if(m_xlsx->save())
+        {
+            qDebug() << "数据写入成功！";
+            queue_mut.lock();
+            data_que_1->clear();
+            data_que_3->clear();
+            data_que_4->clear();
+            queue_mut.unlock();
+            count1 = 1;
+            count3 = 1;
+            count4 = 1;
+            countAll = 1;
+        }
+        else
+        {
+            qDebug() << "数据写入失败！";
+        }
     }
+
 }
 
 void MainWindow::realtimeDataSlot()
@@ -446,19 +514,9 @@ bool MainWindow::checkData(const frame& frame)
 
 void MainWindow::convert(const QByteArray& buf, int size, frame* frame)
 {
-#if 0
-    char array[10] = {0};
-    for(int i=0;i<size;i++){
-        array[i] = buf.at(i);
-    }
-    if(frame != nullptr){
-        memcpy(frame, array, size);
-    }
-#else
     if(frame != nullptr){
         memcpy(frame, buf.data(), size);
     }
-#endif
 }
 
 
@@ -561,3 +619,40 @@ void MainWindow::on_btn_save_s2_clicked()
     }
 }
 
+
+
+void MainWindow::on_btn_save_all_clicked()
+{
+    QString file_name = "all_";
+    if(ui->btn_save_all->text() == "保存所有"){
+        ui->btn_save_all->setText("停止");
+        save_all = true;
+        save_flag = true;
+        saveFlagVector[1] = true;
+        saveFlagVector[3] = true;
+        saveFlagVector[4] = true;
+        QDateTime current_date_time =QDateTime::currentDateTime();
+        QString current_date =current_date_time.toString("yyyy-MM-dd-hh-mm");
+        m_saveName = file_name + current_date + ".xlsx";
+        QXlsx::Document xlsx;                      // 初始化后默认有一个sheet1
+        bool ret = xlsx.saveAs(m_saveName); // 保存到EXCEL_NAME，如果已经存在则覆盖
+        if(ret)
+        {
+            qDebug() << "创建excel成功！";
+            queue_cond.notify_one();
+            ++file_count;
+        }
+        else
+        {
+            qDebug() << "创建excel失败！";
+        }
+
+    }else{
+        ui->btn_save_all->setText("保存所有");
+        save_all = false;
+        save_flag = false;
+        saveFlagVector[1] = false;
+        saveFlagVector[3] = false;
+        saveFlagVector[4] = false;
+    }
+}

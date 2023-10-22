@@ -74,6 +74,8 @@ private slots:
 
     void on_btn_save_s2_clicked();
 
+    void on_btn_save_all_clicked();
+
 private:
     void GetAveriablePort();
     void msleep(int msec);
@@ -104,12 +106,18 @@ private:
     bool save_t_pr{false};
     bool save_r_s1{false};
     bool save_r_s2{false};
+    bool save_all{false};
     std::mutex queue_mut;
+    std::mutex cond_mut;
     std::condition_variable queue_cond;
     QXlsx::Document xlsx;
     std::map<uint8_t, std::deque<uint16_t>> saveDataMap;
     bool saveFlagVector[5]{false,false,false,false,false};
     QThreadPool *mPool;
     SaveThread *mSaveThread[5]{nullptr};
+    int file_count{0};
+    QXlsx::Document* m_xlsx = nullptr;
+    QString m_saveName;
+    std::thread *saveAllThread;
 };
 #endif // MAINWINDOW_H

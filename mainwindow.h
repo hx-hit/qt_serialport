@@ -82,6 +82,8 @@ private:
     void PortConfigureInit();
     void setupQuadraticDemo(QCustomPlot *customPlot);
     void save_thread_function();
+    void show_label_function();
+    void draw_graphy_function();
 
     static uint8_t checkData(uint8_t* input, int size);
     static bool checkData(const frame& frame);
@@ -119,5 +121,7 @@ private:
     QXlsx::Document* m_xlsx = nullptr;
     QString m_saveName;
     std::thread *saveAllThread;
+    std::thread *showLabel;
+    std::thread *drawGraphy;
 };
 #endif // MAINWINDOW_H

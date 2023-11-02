@@ -275,11 +275,16 @@ void MainWindow::setupQuadraticDemo(QCustomPlot *customPlot)
     customPlot->legend->setVisible(true);
     customPlot->axisRect()->insetLayout()->setInsetAlignment(0, Qt::AlignLeft | Qt::AlignTop);
 
+
     // setup a timer that repeatedly calls MainWindow::realtimeDataSlot:
     connect(&dataTimer, SIGNAL(timeout()), this, SLOT(realtimeDataSlot()));
     dataTimer.start(25); // Interval 0 means to refresh as fast as possible
+#ifndef USE_THREAD
     connect(&labelTimer, SIGNAL(timeout()), this, SLOT(updateLabel()));
     labelTimer.start(20);
+#else
+    showLabel = new std::thread(&MainWindow::show_label_function, this);
+#endif
 }
 
 void MainWindow::save_thread_function()
@@ -287,34 +292,54 @@ void MainWindow::save_thread_function()
     QXlsx::Document xlsx;
     QDateTime current_date_time =QDateTime::currentDateTime();
     QString current_date =current_date_time.toString("yyyy-MM-dd-hh-mm");
-    long count1{1}, count3{1}, count4{1}, countAll{1};
-    std::deque<uint16_t> *data_que_1, *data_que_3, *data_que_4;
+    long count0{1}, count1{1}, count2{1}, count3{1}, count4{1};
+    std::deque<uint16_t> *data_que_0, *data_que_1, *data_que_2, *data_que_3, *data_que_4;
     while(1){
         std::unique_lock<std::mutex>lk(cond_mut);
         queue_cond.wait(lk, [&](){return save_flag;});
         m_xlsx = new Document(m_saveName, this);
         if(m_xlsx->load()){
             qDebug() << "excel打开成功!";
-            m_xlsx->write(count1++, 1, "position");
-            m_xlsx->write(count3++, 2, "sensor1");
-            m_xlsx->write(count4++, 3, "sensor2");
+            m_xlsx->write(count0++, 1, "target_position");
+            m_xlsx->write(count1++, 2, "real_position");
+            m_xlsx->write(count2++, 3, "target_pressure");
+            m_xlsx->write(count3++, 4, "sensor1");
+            m_xlsx->write(count4++, 5, "sensor2");
         }else{
             qDebug() << "excel打开失败!";
             continue;
         }
+        data_que_0 = &saveDataMap[0];
         data_que_1 = &saveDataMap[1];
+        data_que_2 = &saveDataMap[2];
         data_que_3 = &saveDataMap[3];
         data_que_4 = &saveDataMap[4];
         while(save_all)
         {
 #if 1
+            if(!data_que_0->empty())
+            {
+                queue_mut.lock();
+                auto data0 = data_que_0->front();
+                data_que_0->pop_front();
+                queue_mut.unlock();
+                m_xlsx->write(count0++, 1, data0);
+            }
             if(!data_que_1->empty())
             {
                 queue_mut.lock();
                 auto data1 = data_que_1->front();
                 data_que_1->pop_front();
                 queue_mut.unlock();
-                m_xlsx->write(count1++, 1, data1);
+                m_xlsx->write(count1++, 2, data1);
+            }
+            if(!data_que_2->empty())
+            {
+                queue_mut.lock();
+                auto data2 = data_que_2->front();
+                data_que_2->pop_front();
+                queue_mut.unlock();
+                m_xlsx->write(count2++, 3, data2);
             }
             if(!data_que_3->empty())
             {
@@ -322,7 +347,7 @@ void MainWindow::save_thread_function()
                 auto data3 = data_que_3->front();
                 data_que_3->pop_front();
                 queue_mut.unlock();
-                m_xlsx->write(count3++, 2, data3*10);
+                m_xlsx->write(count3++, 4, data3*10);
             }
             if(!data_que_4->empty())
             {
@@ -330,27 +355,31 @@ void MainWindow::save_thread_function()
                 auto data4 = data_que_4->front();
                 data_que_4->pop_front();
                 queue_mut.unlock();
-                m_xlsx->write(count4++, 3, data4*10);
+                m_xlsx->write(count4++, 5, data4*10);
             }
 #else
             m_xlsx->write(count1++, 1, 1);
             m_xlsx->write(count3++, 2, 2);
             m_xlsx->write(count4++, 3, 3);
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
 #endif
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+
         }
         if(m_xlsx->save())
         {
             qDebug() << "数据写入成功！";
             queue_mut.lock();
+            data_que_0->clear();
             data_que_1->clear();
+            data_que_2->clear();
             data_que_3->clear();
             data_que_4->clear();
             queue_mut.unlock();
+            count0 = 1;
             count1 = 1;
+            count2 = 1;
             count3 = 1;
             count4 = 1;
-            countAll = 1;
         }
         else
         {
@@ -358,6 +387,22 @@ void MainWindow::save_thread_function()
         }
     }
 
+}
+
+void MainWindow::show_label_function()
+{
+    while(1){
+        updateLabel();
+        std::this_thread::sleep_for(std::chrono::milliseconds(25));
+    }
+}
+
+void MainWindow::draw_graphy_function()
+{
+    while(1){
+//        realtimeDataSlot();
+        std::this_thread::sleep_for(std::chrono::milliseconds(25));
+    }
 }
 
 void MainWindow::realtimeDataSlot()
@@ -410,9 +455,9 @@ void MainWindow::realtimeDataSlot()
         //ui->customPlot->graph(1)->rescaleValueAxis(true);
         lastPointKey = key;
     }
-    if(key > 1000){
+    if(key > 900){
         for(int i=0;i<5;i++){
-                ui->customplot->graph(i)->removeDataBefore(key-1000.0);
+                ui->customplot->graph(i)->removeDataBefore(key-900.0);
         }
     }
     // make key axis range scroll with the data (at a constant range size of 8):
@@ -628,10 +673,12 @@ void MainWindow::on_btn_save_all_clicked()
         ui->btn_save_all->setText("停止");
         save_all = true;
         save_flag = true;
+        saveFlagVector[0] = true;
         saveFlagVector[1] = true;
+        saveFlagVector[2] = true;
         saveFlagVector[3] = true;
         saveFlagVector[4] = true;
-        QDateTime current_date_time =QDateTime::currentDateTime();
+        QDateTime current_date_time = QDateTime::currentDateTime();
         QString current_date =current_date_time.toString("yyyy-MM-dd-hh-mm");
         m_saveName = file_name + current_date + ".xlsx";
         QXlsx::Document xlsx;                      // 初始化后默认有一个sheet1
@@ -651,7 +698,9 @@ void MainWindow::on_btn_save_all_clicked()
         ui->btn_save_all->setText("保存所有");
         save_all = false;
         save_flag = false;
+        saveFlagVector[0] = false;
         saveFlagVector[1] = false;
+        saveFlagVector[2] = false;
         saveFlagVector[3] = false;
         saveFlagVector[4] = false;
     }

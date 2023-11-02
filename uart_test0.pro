@@ -13,6 +13,7 @@ QXLSX_HEADERPATH=./QXlsx/header/  # current QXlsx header path is ./header/
 QXLSX_SOURCEPATH=./QXlsx/source/  # current QXlsx source path is ./source/
 include(./QXlsx/QXlsx.pri)
 
+DEFINES += USE_THREAD
 
 SOURCES += \
     customplot/qcustomplot.cpp \

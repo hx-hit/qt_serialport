@@ -17,6 +17,7 @@ DEFINES += USE_THREAD
 
 SOURCES += \
     customplot/qcustomplot.cpp \
+    flowrate.cpp \
     main.cpp \
     mainwindow.cpp \
     savethread.cpp
@@ -25,10 +26,12 @@ HEADERS += \
     RingBuffer.hpp \
     cmd.h \
     customplot/qcustomplot.h \
+    flowrate.h \
     mainwindow.h \
     savethread.h
 
 FORMS += \
+    flowrate.ui \
     mainwindow.ui
 
 # Default rules for deployment.

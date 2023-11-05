@@ -5,8 +5,6 @@
 #include "QDebug"
 #include "cmd.h"
 
-RingBuffer<frame, 5> ringBuffer;
-
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
@@ -157,12 +155,15 @@ void MainWindow::Read_Date()
         if(textstate_receive == true)   //文本模式
         {
             QString str = ui->recv_text_window->toPlainText();
+            if(str.size()>500){
+                str = str.right(500);
+            }
             str += tr(buf);
             str += " ";
             ui->recv_text_window->clear();
             ui->recv_text_window->append(str);
         }
-        if(textstate_receive == false)   //文本模式
+        if(textstate_receive == false)   //非文本模式
         {
             QString str = ui->recv_text_window->toPlainText();
             if(str.size()>500){
@@ -172,7 +173,6 @@ void MainWindow::Read_Date()
             QByteArray temp = buf.toHex();
             str += tr(temp);
             str += "  ";
-//            qDebug()<<str.size();
             ui->recv_text_window->clear();
             ui->recv_text_window->append(str);
         }
@@ -362,7 +362,7 @@ void MainWindow::save_thread_function()
             m_xlsx->write(count3++, 2, 2);
             m_xlsx->write(count4++, 3, 3);
 #endif
-            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
         }
         if(m_xlsx->save())
@@ -705,3 +705,10 @@ void MainWindow::on_btn_save_all_clicked()
         saveFlagVector[4] = false;
     }
 }
+
+void MainWindow::on_actionFlowRate_triggered()
+{
+    FlowRate* flow = new FlowRate();
+    flow->show();
+}
+

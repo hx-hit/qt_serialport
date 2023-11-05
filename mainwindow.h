@@ -15,7 +15,7 @@
 #include "map"
 #include <QDateTime>
 #include "savethread.h"
-
+#include "flowrate.h"
 #include "xlsxdocument.h"
 #include "xlsxchartsheet.h"
 #include "xlsxcellrange.h"
@@ -75,6 +75,8 @@ private slots:
     void on_btn_save_s2_clicked();
 
     void on_btn_save_all_clicked();
+
+    void on_actionFlowRate_triggered();
 
 private:
     void GetAveriablePort();

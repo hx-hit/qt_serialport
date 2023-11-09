@@ -155,8 +155,8 @@ void MainWindow::Read_Date()
         if(textstate_receive == true)   //文本模式
         {
             QString str = ui->recv_text_window->toPlainText();
-            if(str.size()>500){
-                str = str.right(500);
+            if(str.size()>240){
+                str = str.right(240);
             }
             str += tr(buf);
             str += " ";
@@ -166,8 +166,8 @@ void MainWindow::Read_Date()
         if(textstate_receive == false)   //非文本模式
         {
             QString str = ui->recv_text_window->toPlainText();
-            if(str.size()>500){
-                str = str.right(500);
+            if(str.size()>240){
+                str = str.right(240);
             }
             // byteArray 转 16进制
             QByteArray temp = buf.toHex();
@@ -455,13 +455,13 @@ void MainWindow::realtimeDataSlot()
         //ui->customPlot->graph(1)->rescaleValueAxis(true);
         lastPointKey = key;
     }
-    if(key > 900){
+    if(key > 600){
         for(int i=0;i<5;i++){
-                ui->customplot->graph(i)->removeDataBefore(key-900.0);
+                ui->customplot->graph(i)->removeDataBefore(key-600.0);
         }
     }
     // make key axis range scroll with the data (at a constant range size of 8):
-    ui->customplot->xAxis->setRange(key, 900, Qt::AlignRight);
+    ui->customplot->xAxis->setRange(key, 600, Qt::AlignRight);
     ui->customplot->replot();
 }
 
@@ -708,7 +708,10 @@ void MainWindow::on_btn_save_all_clicked()
 
 void MainWindow::on_actionFlowRate_triggered()
 {
-    FlowRate* flow = new FlowRate();
-    flow->show();
+    if(mFlowRate == nullptr){
+        mFlowRate = new FlowRate();
+        mFlowRate->show();
+    }
+
 }
 

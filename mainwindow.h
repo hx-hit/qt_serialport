@@ -125,5 +125,6 @@ private:
     std::thread *saveAllThread;
     std::thread *showLabel;
     std::thread *drawGraphy;
+    FlowRate* mFlowRate{nullptr};
 };
 #endif // MAINWINDOW_H
